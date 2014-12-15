@@ -1,47 +1,68 @@
+# -*- coding: utf-8 -*-
+from .baseapi import BaseAPI
 import requests
 
-class SSHKey(object):
-    def __init__(self, client_id="", api_key="", *args, **kwargs):
-
-        self.client_id = client_id
-        self.api_key = api_key
-
+class SSHKey(BaseAPI):
+    def __init__(self, *args, **kwargs):
         self.id = ""
         self.name = None
-        self.ssh_pub_key = None
+        self.public_key = None
+        self.fingerprint = None
 
-        #Setting the attribute values
-        for attr in kwargs.keys():
-            setattr(self,attr,kwargs[attr])
+        super(SSHKey, self).__init__(*args, **kwargs)
 
-    def __call_api(self, path, params=dict()):
-        payload = {'client_id': self.client_id, 'api_key': self.api_key}
-        payload.update(params)
-        r = requests.get("https://api.digitalocean.com/v1/ssh_keys/%s%s" % ( self.id, path ), params=payload)
-
-        data = r.json()
-        self.call_response = data
-        if data['status'] != "OK":
-            msg = [data[m] for m in ("message", "error_message", "status") if m in data][0]
-            raise Exception(msg)
-
-        return data
+    @classmethod
+    def get_object(cls, api_token, ssh_key_id):
+        """
+            Class method that will return a SSHKey object by ID.
+        """
+        ssh_key = cls(token=api_token, id=ssh_key_id)
+        ssh_key.load()
+        return ssh_key
 
     def load(self):
-        ssh_key = self.__call_api("")['ssh_key']
-        self.ssh_pub_key = ssh_key['ssh_pub_key']
-        self.name = ssh_key['name']
+        data = self.get_data(
+            "account/keys/%s" % self.id,
+            type="GET"
+        )
+
+        ssh_key = data['ssh_key']
+
+        #Setting the attribute values
+        for attr in ssh_key.keys():
+            setattr(self,attr,ssh_key[attr])
         self.id = ssh_key['id']
+
+    def load_by_pub_key(self, public_key):
+        """
+            This method will laod a SSHKey object from DigitalOcean
+            from a public_key. This method will avoid problem like
+            uploading the same public_key twice.
+        """
+
+        data = self.get_data("account/keys/")
+        for jsoned in data['ssh_keys']:
+            if jsoned.get('public_key', "") == public_key:
+                self.id = jsoned['id']
+                self.load()
+                return self
+        return None
 
     def create(self):
         """
             Create the SSH Key
         """
-        data = {
+        input_params = {
                 "name": self.name,
-                "ssh_pub_key": self.ssh_pub_key,
+                "public_key": self.public_key,
             }
-        data = self.__call_api("/new/", data)
+
+        data = self.get_data(
+            "account/keys/",
+            type="POST",
+            params=input_params
+        )
+
         if data:
             self.id = data['ssh_key']['id']
 
@@ -49,11 +70,17 @@ class SSHKey(object):
         """
             Edit the SSH Key
         """
-        data = {
+        input_params = {
                 "name": self.name,
-                "ssh_pub_key": self.ssh_pub_key,
+                "public_key": self.public_key,
             }
-        data = self.__call_api("/edit/", data)
+
+        data = self.get_data(
+            "account/keys/%s" % self.id,
+            type="PUT",
+            params=input_params
+        )
+
         if data:
             self.id = data['ssh_key']['id']
 
@@ -61,4 +88,10 @@ class SSHKey(object):
         """
             Destroy the SSH Key
         """
-        self.__call_api("/destroy/")
+        return self.get_data(
+            "account/keys/%s" % self.id,
+            type="DELETE",
+        )
+
+    def __str__(self):
+        return "%s %s" % (self.id, self.name)

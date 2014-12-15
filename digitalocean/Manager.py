@@ -1,41 +1,63 @@
-import requests
+# -*- coding: utf-8 -*-
+from .baseapi import BaseAPI
 from .Droplet import Droplet
 from .Region import Region
 from .Size import Size
 from .Image import Image
 from .Domain import Domain
 from .SSHKey import SSHKey
+from .Action import Action
 
 
-class Manager(object):
-    def __init__(self, client_id="", api_key=""):
-        self.client_id = client_id
-        self.api_key = api_key
-        self.call_response = None
+class Manager(BaseAPI):
+    def __init__(self, *args, **kwargs):
+        super(Manager, self).__init__(*args, **kwargs)
 
-    def __call_api(self, path, params=dict()):
-        payload = {'client_id': self.client_id, 'api_key': self.api_key}
-        payload.update(params)
-        r = requests.get("https://api.digitalocean.com/v1/%s" % path, params=payload)
-        data = r.json()
-        self.call_response = data
-        if data['status'] != "OK":
-            msg = [data[m] for m in ("message", "error_message", "status") if m in data][0]
-            raise Exception(msg)
+    def get_data(self, *args, **kwargs):
+        """
+            Customized version of get_data to perform __check_actions_in_data
+        """
+        data = super(Manager, self).get_data(*args, **kwargs)
+
+        params = {}
+        if "params" in kwargs:
+            params = kwargs['params']
+        unpaged_data = self.__deal_with_pagination(args[0], data, params)
+
+        return unpaged_data
+
+    def __deal_with_pagination(self, url, data, params):
+        """
+            Perform multiple calls in order to have a full list of elements
+            when the API are "paginated". (content list is divided in more
+            than one page)
+        """
+        try:
+            pages = data['links']['pages']['last'].split('=')[-1]
+            key, values = data.popitem()
+            for page in range(2, int(pages) + 1):
+                params.update({'page': page})
+                new_data = super(Manager, self).get_data(url, params=params)
+
+                more_values = new_data.values()[0]
+                for value in more_values:
+                    values.append(value)
+            data = {}
+            data[key] = values
+        except KeyError: # No pages.
+            pass
+
         return data
 
     def get_all_regions(self):
         """
             This function returns a list of Region object.
         """
-        data = self.__call_api("/regions/")
+        data = self.get_data("regions/")
         regions = list()
         for jsoned in data['regions']:
-            region = Region()
-            region.id = jsoned['id']
-            region.name = jsoned['name']
-            region.client_id = self.client_id
-            region.api_key = self.api_key
+            region = Region(**jsoned)
+            region.token = self.token
             regions.append(region)
         return regions
 
@@ -43,42 +65,37 @@ class Manager(object):
         """
             This function returns a list of Droplet object.
         """
-        data = self.__call_api("/droplets/")
+        data = self.get_data("droplets/")
         droplets = list()
         for jsoned in data['droplets']:
-            droplet = Droplet()
-            droplet.backup_active = jsoned['backups_active']
-            droplet.region_id = jsoned['region_id']
-            droplet.size_id = jsoned['size_id']
-            droplet.image_id = jsoned['image_id']
-            droplet.status = jsoned['status']
-            droplet.name = jsoned['name']
-            droplet.id = jsoned['id']
-            droplet.ip_address = jsoned['ip_address']
-            droplet.private_ip_address = jsoned['private_ip_address']
-            droplet.created_at = jsoned['created_at']
-            droplet.client_id = self.client_id
-            droplet.api_key = self.api_key
+            droplet = Droplet(**jsoned)
+            droplet.token = self.token
+
+            for net in droplet.networks['v4']:
+                if net['type'] == 'private':
+                    droplet.private_ip_address = net['ip_address']
+                if net['type'] == 'public':
+                    droplet.ip_address = net['ip_address']
+            if droplet.networks['v6']:
+                droplet.ip_v6_address = droplet.networks['v6'][0]['ip_address']
             droplets.append(droplet)
         return droplets
+
+    def get_droplet(self, droplet_id):
+        """
+            Return a Droplet by its ID.
+        """
+        return Droplet.get_object(api_token=self.token, droplet_id=droplet_id)
 
     def get_all_sizes(self):
         """
             This function returns a list of Size object.
         """
-        data = self.__call_api("/sizes/")
+        data = self.get_data("sizes/")
         sizes = list()
         for jsoned in data['sizes']:
-            size = Size()
-            size.id = jsoned['id']
-            size.name = jsoned['name']
-            size.memory = jsoned['memory']
-            size.cpu = jsoned['cpu']
-            size.disk = jsoned['disk']
-            size.cost_per_hour = jsoned['cost_per_hour']
-            size.cost_per_month = jsoned['cost_per_month']
-            size.client_id = self.client_id
-            size.api_key = self.api_key
+            size = Size(**jsoned)
+            size.token = self.token
             sizes.append(size)
         return sizes
 
@@ -86,81 +103,87 @@ class Manager(object):
         """
             This function returns a list of Image object.
         """
-        data = self.__call_api("/images/")
+        data = self.get_data("images/")
         images = list()
         for jsoned in data['images']:
-            image = Image()
-            image.id = jsoned['id']
-            image.name = jsoned['name']
-            image.distribution = jsoned['distribution']
-            image.client_id = self.client_id
-            image.api_key = self.api_key
+            image = Image(**jsoned)
+            image.token = self.token
             images.append(image)
         return images
+
+    def get_image(self, image_id):
+        """
+            Return a Image by its ID.
+        """
+        return Image.get_object(api_token=self.token, image_id=image_id)
 
     def get_my_images(self):
         """
             This function returns a list of Image object.
         """
-        data = self.__call_api("/images/",{"filter":"my_images"})
+        data = self.get_data("images/")
         images = list()
         for jsoned in data['images']:
-            image = Image()
-            image.id = jsoned['id']
-            image.name = jsoned['name']
-            image.distribution = jsoned['distribution']
-            image.client_id = self.client_id
-            image.api_key = self.api_key
-            images.append(image)
+            if not jsoned['public']:
+                image = Image(**jsoned)
+                image.token = self.token
+                images.append(image)
         return images
 
     def get_global_images(self):
         """
             This function returns a list of Image object.
         """
-        data = self.__call_api("/images/",{"filter":"global"})
+        data = self.get_data("images/")
         images = list()
         for jsoned in data['images']:
-            image = Image()
-            image.id = jsoned['id']
-            image.name = jsoned['name']
-            image.distribution = jsoned['distribution']
-            image.client_id = self.client_id
-            image.api_key = self.api_key
-            images.append(image)
+            if jsoned['public']:
+                image = Image(**jsoned)
+                image.token = self.token
+                images.append(image)
         return images
 
     def get_all_domains(self):
         """
             This function returns a list of Domain object.
         """
-        data = self.__call_api("/domains/")
+        data = self.get_data("domains/")
         domains = list()
         for jsoned in data['domains']:
-            domain = Domain()
-            domain.zone_file_with_error = jsoned['zone_file_with_error']
-            domain.error = jsoned['error']
-            domain.live_zone_file = jsoned['live_zone_file']
-            domain.ttl = jsoned['ttl']
-            domain.name = jsoned['name']
-            domain.id = jsoned['id']
-            domain.client_id = self.client_id
-            domain.api_key = self.api_key
+            domain = Domain(**jsoned)
+            domain.token = self.token
             domains.append(domain)
         return domains
+
+    def get_domain(self, domain_name):
+        """
+            Return a Domain by its domain_name
+        """
+        return Domain.get_object(api_token=self.token, domain_name=domain_name)
 
     def get_all_sshkeys(self):
         """
             This function returns a list of SSHKey object.
         """
-        data = self.__call_api("/ssh_keys/")
+        data = self.get_data("account/keys/")
         ssh_keys = list()
         for jsoned in data['ssh_keys']:
-            ssh_key = SSHKey()
-            ssh_key.id = jsoned['id']
-            ssh_key.name = jsoned['name']
-            ssh_key.client_id = self.client_id
-            ssh_key.api_key = self.api_key
+            ssh_key = SSHKey(**jsoned)
+            ssh_key.token = self.token
             ssh_keys.append(ssh_key)
         return ssh_keys
 
+    def get_ssh_key(self, ssh_key_id):
+        """
+            Return a SSHKey object by its ID.
+        """
+        return SSHKey.get_object(api_token=self.token, ssh_key_id=ssh_key_id)
+
+    def get_action(self, action_id):
+        """
+            Return an Action object by a specific ID.
+        """
+        return Action.get_object(api_token=self.token, action_id=action_id)
+
+    def __str__(self):
+        return "%s" % (self.token)
