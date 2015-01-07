@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from .baseapi import BaseAPI
-import requests
+
 
 class SSHKey(BaseAPI):
     def __init__(self, *args, **kwargs):
@@ -21,16 +21,27 @@ class SSHKey(BaseAPI):
         return ssh_key
 
     def load(self):
+        """
+            Load the SSHKey object from DigitalOcean.
+
+            Requires either self.id or self.fingerprint to be set.
+        """
+        identifier = None
+        if self.id is not None:
+            identifier = self.id
+        elif self.fingerprint is not None:
+            identifier = self.fingerprint
+
         data = self.get_data(
-            "account/keys/%s" % self.id,
+            "account/keys/%s" % identifier,
             type="GET"
         )
 
         ssh_key = data['ssh_key']
 
-        #Setting the attribute values
+        # Setting the attribute values
         for attr in ssh_key.keys():
-            setattr(self,attr,ssh_key[attr])
+            setattr(self, attr, ssh_key[attr])
         self.id = ssh_key['id']
 
     def load_by_pub_key(self, public_key):
@@ -53,9 +64,9 @@ class SSHKey(BaseAPI):
             Create the SSH Key
         """
         input_params = {
-                "name": self.name,
-                "public_key": self.public_key,
-            }
+            "name": self.name,
+            "public_key": self.public_key,
+        }
 
         data = self.get_data(
             "account/keys/",
@@ -71,9 +82,9 @@ class SSHKey(BaseAPI):
             Edit the SSH Key
         """
         input_params = {
-                "name": self.name,
-                "public_key": self.public_key,
-            }
+            "name": self.name,
+            "public_key": self.public_key,
+        }
 
         data = self.get_data(
             "account/keys/%s" % self.id,

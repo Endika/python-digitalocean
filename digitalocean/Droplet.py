@@ -1,20 +1,23 @@
 # -*- coding: utf-8 -*-
-import requests
 from .Action import Action
 from .Image import Image
 from .Kernel import Kernel
 from .baseapi import BaseAPI, Error
 from .SSHKey import SSHKey
 
+
 class DropletError(Error):
     """Base exception class for this module"""
     pass
 
+
 class BadKernelObject(DropletError):
     pass
 
+
 class BadSSHKeyFormat(DropletError):
     pass
+
 
 class Droplet(BaseAPI):
     """"Droplet managment
@@ -124,7 +127,7 @@ class Droplet(BaseAPI):
         droplet = droplets['droplet']
 
         for attr in droplet.keys():
-            setattr(self,attr,droplet[attr])
+            setattr(self, attr, droplet[attr])
 
         for net in self.networks['v4']:
             if net['type'] == 'private':
@@ -132,118 +135,178 @@ class Droplet(BaseAPI):
             if net['type'] == 'public':
                 self.ip_address = net['ip_address']
         if self.networks['v6']:
-            self.ip_v6_address = droplet.networks['v6'][0]['ip_address']
+            self.ip_v6_address = self.networks['v6'][0]['ip_address']
         return self
 
-    def power_on(self):
+    def _perform_action(self, params, return_dict=True):
+        """
+            Perform a droplet action.
+
+            Args:
+                params - dict : parameters of the action
+
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        action = self.get_data(
+            "droplets/%s/actions/" % self.id,
+            type="POST",
+            params=params
+        )
+        if return_dict:
+            return action
+        else:
+            action = action[u'action']
+            return_action = Action()
+            # Loading attributes
+            for attr in action.keys():
+                setattr(return_action, attr, action[attr])
+            return return_action
+
+    def power_on(self, return_dict=True):
         """
             Boot up the droplet
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'power_on'}
-        )
 
-    def shutdown(self):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'power_on'}, return_dict)
+
+    def shutdown(self, return_dict=True):
         """
             shutdown the droplet
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'shutdown'}
-        )
 
-    def reboot(self):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'shutdown'}, return_dict)
+
+    def reboot(self, return_dict=True):
         """
             restart the droplet
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'reboot'}
-        )
 
-    def power_cycle(self):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'reboot'}, return_dict)
+
+    def power_cycle(self, return_dict=True):
         """
             restart the droplet
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'power_cycle'}
-        )
 
-    def power_off(self):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'power_cycle'}, return_dict)
+
+    def power_off(self, return_dict=True):
         """
             restart the droplet
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'power_off'}
-        )
 
-    def reset_root_password(self):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'power_off'}, return_dict)
+
+    def reset_root_password(self, return_dict=True):
         """
             reset the root password
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'password_reset'}
-        )
 
-    def resize(self, new_size_slug):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'password_reset'}, return_dict)
+
+    def resize(self, new_size_slug, return_dict=True):
         """Resize the droplet to a new size slug.
 
         Args:
             new_size_slug: str - name of new size
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={"type": "resize", "size": new_size_slug}
+        return self._perform_action(
+            {"type": "resize", "size": new_size_slug},
+            return_dict
         )
 
-    def take_snapshot(self, snapshot_name):
+    def take_snapshot(self, snapshot_name, return_dict=True):
         """Take a snapshot!
 
         Args:
             snapshot_name: str - name of snapshot
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={"type": "snapshot", "name": snapshot_name}
+        return self._perform_action(
+            {"type": "snapshot", "name": snapshot_name},
+            return_dict
         )
 
-    def restore(self, image_id):
+    def restore(self, image_id, return_dict=True):
         """Restore the droplet to an image ( snapshot or backup )
 
         Args:
             image_id : int - id of image
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={"type":"restore", "image": image_id}
+        return self._perform_action(
+            {"type": "restore", "image": image_id},
+            return_dict
         )
 
-    def rebuild(self, image_id=None):
+    def rebuild(self, image_id=None, return_dict=True):
         """Restore the droplet to an image ( snapshot or backup )
 
         Args:
             image_id : int - id of image
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
-        if self.image['id'] and not image_id:
+        if not image_id:
             image_id = self.image['id']
 
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={"type": "rebuild", "image": image_id}
+        return self._perform_action(
+            {"type": "rebuild", "image": image_id},
+            return_dict
         )
 
     def enable_backups(self):
@@ -252,101 +315,134 @@ class Droplet(BaseAPI):
         """
         print("Not yet implemented in APIv2")
 
-    def disable_backups(self):
+    def disable_backups(self, return_dict=True):
         """
             Disable automatic backups
+
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
         """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'disable_backups'}
-        )
+        return self._perform_action({'type': 'disable_backups'}, return_dict)
 
     def destroy(self):
         """
             Destroy the droplet
+
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
         """
         return self.get_data(
             "droplets/%s" % self.id,
             type="DELETE"
         )
 
-    def rename(self, name):
+    def rename(self, name, return_dict=True):
         """Rename the droplet
 
         Args:
             name : str - new name
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'rename', 'name': name}
+        return self._perform_action(
+            {'type': 'rename', 'name': name},
+            return_dict
         )
 
-    def enable_private_networking(self):
+    def enable_private_networking(self, return_dict=True):
         """
            Enable private networking on an existing Droplet where available.
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'enable_private_networking'}
-        )
 
-    def enable_ipv6(self):
+           Optional Args:
+               return_dict - bool : Return a dict when True (default),
+                   otherwise return an Action.
+
+           Returns dict or Action
+        """
+        return self._perform_action({'type': 'enable_private_networking'}, return_dict)
+
+    def enable_ipv6(self, return_dict=True):
         """
             Enable IPv6 on an existing Droplet where available.
-        """
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type': 'enable_ipv6'}
-        )
 
-    def change_kernel(self, kernel):
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
+        """
+        return self._perform_action({'type': 'enable_ipv6'}, return_dict)
+
+    def change_kernel(self, kernel, return_dict=True):
         """Change the kernel to a new one
 
         Args:
             kernel : instance of digitalocean.Kernel.Kernel
+
+        Optional Args:
+            return_dict - bool : Return a dict when True (default),
+                otherwise return an Action.
+
+        Returns dict or Action
         """
         if type(kernel) != Kernel:
             raise BadKernelObject("Use Kernel object")
 
-        return self.get_data(
-            "droplets/%s/actions/" % self.id,
-            type="POST",
-            params={'type' : 'change_kernel', 'kernel': kernel.id}
+        return self._perform_action(
+            {'type': 'change_kernel', 'kernel': kernel.id},
+            return_dict
         )
 
-    def __get_ssh_keys_id(self):
+    def __get_ssh_keys_id_or_fingerprint(self):
         """
-            Check and return a list of SSH key IDs according to DigitalOcean's
-            API. This method is usde to check and create a droplet with the
-            correct SSH keys.
+            Check and return a list of SSH key IDs or fingerprints according
+            to DigitalOcean's API. This method is used to check and create a
+            droplet with the correct SSH keys.
         """
         ssh_keys_id = list()
         for ssh_key in self.ssh_keys:
             if type(ssh_key) in [int, long]:
-                ssh_keys_id.append( int(ssh_key) )
+                ssh_keys_id.append(int(ssh_key))
 
             elif type(ssh_key) == SSHKey:
                 ssh_keys_id.append(ssh_key.id)
 
             elif type(ssh_key) in [str, unicode]:
-                key = SSHKey()
-                key.token = self.token
-                results = key.load_by_pub_key(ssh_key)
+                # ssh_key could either be a fingerprint or a public key
+                regexp_of_fingerprint = '([0-9a-fA-F]{2}:){15}[0-9a-fA-F]'
+                match = re.match(regexp_of_fingerprint, ssh_key)
 
-                if results == None:
-                    key.public_key = ssh_key
-                    key.name = "SSH Key %s" % self.name
-                    key.create()
+                if match is not None and match.end() == len(ssh_key) - 1:
+                    ssh_keys_id.append(ssh_key)
+
                 else:
-                    key = results
+                    key = SSHKey()
+                    key.token = self.token
+                    results = key.load_by_pub_key(ssh_key)
 
-                ssh_keys_id.append(key.id)
+                    if results is None:
+                        key.public_key = ssh_key
+                        key.name = "SSH Key %s" % self.name
+                        key.create()
+                    else:
+                        key = results
+
+                    ssh_keys_id.append(key.id)
             else:
-                raise BadSSHKeyFormat("Droplet.ssh_keys should be a list of IDs or public keys")
+                raise BadSSHKeyFormat(
+                    "Droplet.ssh_keys should be a list of IDs, public keys"
+                     + " or fingerprints."
+                )
 
         return ssh_keys_id
 
@@ -358,15 +454,19 @@ class Droplet(BaseAPI):
             assigned to the object.
         """
         for attr in kwargs.keys():
-            setattr(self,attr,kwargs[attr])
+            setattr(self, attr, kwargs[attr])
+
+        # Provide backwards compatibility
+        if not self.size_slug and self.size:
+            self.size_slug = self.size
 
         data = {
-                "name": self.name,
-                "size": self.size_slug,
-                "image": self.image,
-                "region": self.region,
-                "ssh_keys[]": self.__get_ssh_keys_id(),
-            }
+            "name": self.name,
+            "size": self.size_slug,
+            "image": self.image,
+            "region": self.region,
+            "ssh_keys[]": self.__get_ssh_keys_id_or_fingerprint(),
+        }
 
         if self.backups:
             data['backups'] = True
@@ -388,11 +488,9 @@ class Droplet(BaseAPI):
 
         if data:
             self.id = data['droplet']['id']
-
-        if u"action_ids" in data[u'droplet']:
+            action_id = data['links']['actions'][0]['id']
             self.action_ids = []
-            for id in data[u'droplet'][u'action_ids']:
-                self.action_ids.append(id)
+            self.action_ids.append(action_id)
 
     def get_events(self):
         """
@@ -407,7 +505,7 @@ class Droplet(BaseAPI):
             This actions can be used to check the droplet's status
         """
         answer = self.get_data(
-            "droplets/%s/actions" % self.id,
+            "droplets/%s/actions/" % self.id,
             type="GET"
         )
 
@@ -456,10 +554,13 @@ class Droplet(BaseAPI):
                     kernel = Kernel(**jsond)
                     kernel.token = self.token
                     kernels.append(kernel)
-                url = data[u'links'][u'pages'].get(u'next')
-                if not url:
-                        break
-                data = self.get_data(data[u'links'][u'pages'].get(u'next'))
+                try:
+                    url = data[u'links'][u'pages'].get(u'next')
+                    if not url:
+                            break
+                    data = self.get_data(url)
+                except KeyError:  # No links.
+                    break
 
         return kernels
 
