@@ -16,13 +16,20 @@ class Manager(BaseAPI):
 
     def get_data(self, *args, **kwargs):
         """
-            Customized version of get_data to perform __check_actions_in_data
-        """
-        data = super(Manager, self).get_data(*args, **kwargs)
+            Customized version of get_data to perform __check_actions_in_data.
 
+            The default amount of elements per page defined is 200 as explained
+            here: https://github.com/koalalorenzo/python-digitalocean/pull/78
+        """
         params = {}
         if "params" in kwargs:
-            params = kwargs['params']
+            params = kwargs["params"]
+
+        if "per_page" not in params:
+            params["per_page"] = 200
+
+        kwargs["params"] = params
+        data = super(Manager, self).get_data(*args, **kwargs)
         unpaged_data = self.__deal_with_pagination(args[0], data, params)
 
         return unpaged_data
@@ -40,7 +47,7 @@ class Manager(BaseAPI):
                 params.update({'page': page})
                 new_data = super(Manager, self).get_data(url, params=params)
 
-                more_values = new_data.values()[0]
+                more_values = list(new_data.values())[0]
                 for value in more_values:
                     values.append(value)
             data = {}
@@ -106,16 +113,29 @@ class Manager(BaseAPI):
             sizes.append(size)
         return sizes
 
-    def get_all_images(self):
+    def get_images(self, private=False, type=None):
         """
             This function returns a list of Image object.
         """
-        data = self.get_data("images/")
+        params = {}
+        if private:
+            params['private'] = 'true'
+        if type:
+            params['type'] = type
+        data = self.get_data("images/", params=params)
         images = list()
         for jsoned in data['images']:
             image = Image(**jsoned)
             image.token = self.token
             images.append(image)
+        return images
+
+    def get_all_images(self):
+        """
+            This function returns a list of Image objects containing all
+            available DigitalOcean images, both public and private.
+        """
+        images = self.get_images()
         return images
 
     def get_image(self, image_id):
@@ -126,29 +146,43 @@ class Manager(BaseAPI):
 
     def get_my_images(self):
         """
-            This function returns a list of Image object.
+            This function returns a list of Image objects representing
+            private DigitalOcean images (e.g. snapshots and backups).
         """
-        data = self.get_data("images/")
-        images = list()
-        for jsoned in data['images']:
-            if not jsoned['public']:
-                image = Image(**jsoned)
-                image.token = self.token
-                images.append(image)
+        images = self.get_images(private=True)
         return images
 
     def get_global_images(self):
         """
-            This function returns a list of Image object.
+            This function returns a list of Image objects representing
+            public DigitalOcean images (e.g. base distribution images
+            and 'One-Click' applications).
         """
-        data = self.get_data("images/")
+        data = self.get_images()
         images = list()
-        for jsoned in data['images']:
-            if jsoned['public']:
-                image = Image(**jsoned)
-                image.token = self.token
-                images.append(image)
+        for i in data:
+            if i.public:
+                i.token = self.token
+                images.append(i)
         return images
+
+    def get_distro_images(self):
+        """
+            This function returns a list of Image objects representing
+            public base distribution images.
+        """
+        images = self.get_images(type='distribution')
+        return images
+
+
+    def get_app_images(self):
+        """
+            This function returns a list of Image objectobjects representing
+            public DigitalOcean 'One-Click' application images.
+        """
+        images = self.get_images(type='application')
+        return images
+
 
     def get_all_domains(self):
         """

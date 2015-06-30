@@ -1,22 +1,16 @@
-import os
-import re
 import unittest
 import responses
-
+import json
 import digitalocean
 
-class TestDroplet(unittest.TestCase):
+from .BaseTest import BaseTest
 
-    def load_from_file(self, json_file):
-        cwd = os.path.dirname(__file__)
-        with open(os.path.join(cwd, 'data/%s' % json_file), 'r') as f:
-            return f.read()
+
+class TestDomain(BaseTest):
 
     def setUp(self):
-        self.base_url = "https://api.digitalocean.com/v2/"
-        self.token = "afaketokenthatwillworksincewemockthings"
-        self.domain = digitalocean.Domain(name='example.com',
-                                          token=self.token)
+        super(TestDomain, self).setUp()
+        self.domain = digitalocean.Domain(name='example.com', token=self.token)
 
     @responses.activate
     def test_load(self):
@@ -41,7 +35,7 @@ class TestDroplet(unittest.TestCase):
                       status=204,
                       content_type='application/json')
 
-        response = self.domain.destroy()
+        self.domain.destroy()
 
         self.assertEqual(responses.calls[0].request.url,
                          self.base_url + "domains/example.com")
@@ -56,13 +50,14 @@ class TestDroplet(unittest.TestCase):
                       status=201,
                       content_type='application/json')
 
-        response = self.domain.create_new_domain_record(type = "CNAME",
-                                                        name = "www",
-                                                        data = "@")
+        response = self.domain.create_new_domain_record(
+            type="CNAME", name="www", data="@")
 
-        self.assertEqual(responses.calls[0].request.url,
-                         self.base_url + \
-                         "domains/example.com/records?type=CNAME&data=%40&name=www")
+        self.assert_url_query_equal(
+            responses.calls[0].request.url,
+            self.base_url + "domains/example.com/records")
+        self.assertEqual(json.loads(responses.calls[0].request.body),
+                         {"type": "CNAME", "data": "@", "name": "www"})
         self.assertEqual(response['domain_record']['type'], "CNAME")
         self.assertEqual(response['domain_record']['name'], "www")
         self.assertEqual(response['domain_record']['data'], "@")
@@ -81,9 +76,10 @@ class TestDroplet(unittest.TestCase):
                                      ip_address="1.1.1.1",
                                      token=self.token).create()
 
-        self.assertEqual(responses.calls[0].request.url,
-                         self.base_url + \
-                         "domains?ip_address=1.1.1.1&name=example.com")
+        self.assert_url_query_equal(
+            responses.calls[0].request.url, self.base_url + "domains")
+        self.assertEqual(json.loads(responses.calls[0].request.body),
+                         {'ip_address': '1.1.1.1', 'name': 'example.com'})
         self.assertEqual(domain['domain']['name'], "example.com")
         self.assertEqual(domain['domain']['ttl'], 1800)
 
@@ -106,3 +102,6 @@ class TestDroplet(unittest.TestCase):
         self.assertEqual(records[0].name, "@")
         self.assertEqual(records[4].type, "CNAME")
         self.assertEqual(records[4].name, "example")
+
+if __name__ == '__main__':
+    unittest.main()

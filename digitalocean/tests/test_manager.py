@@ -1,19 +1,15 @@
-import os
 import unittest
 import responses
 
 import digitalocean
 
-class TestManager(unittest.TestCase):
+from .BaseTest import BaseTest
 
-    def load_from_file(self, json_file):
-        cwd = os.path.dirname(__file__)
-        with open(os.path.join(cwd, 'data/%s' % json_file), 'r') as f:
-            return f.read()
+
+class TestManager(BaseTest):
 
     def setUp(self):
-        self.base_url = "https://api.digitalocean.com/v2/"
-        self.token = "afaketokenthatwillworksincewemockthings"
+        super(TestManager, self).setUp()
         self.manager = digitalocean.Manager(token=self.token)
 
     @responses.activate
@@ -50,7 +46,7 @@ class TestManager(unittest.TestCase):
             bad_token.get_all_regions()
 
         exception = error.exception
-        self.assertEqual(exception.message, 'Unable to authenticate you.')
+        self.assertEqual(str(exception), 'Unable to authenticate you.')
 
     @responses.activate
     def test_droplets(self):
@@ -78,7 +74,7 @@ class TestManager(unittest.TestCase):
         self.assertEqual(droplet.created_at, "2014-11-14T16:29:21Z")
         self.assertEqual(droplet.ip_address, "104.236.32.182")
         self.assertEqual(droplet.ip_v6_address,
-                "2604:A880:0800:0010:0000:0000:02DD:4001")
+                         "2604:A880:0800:0010:0000:0000:02DD:4001")
         self.assertEqual(droplet.kernel['id'], 2233)
         self.assertEqual(droplet.backup_ids, [7938002])
         self.assertEqual(droplet.features, ["backups",
@@ -146,7 +142,7 @@ class TestManager(unittest.TestCase):
 
         image = all_images[0]
         self.assertEqual(image.token, self.token)
-        self.assertEqual(image.id, 119192817) 
+        self.assertEqual(image.id, 119192817)
         self.assertEqual(image.name, '14.04 x64')
         self.assertTrue(image.public)
         self.assertEqual(image.slug, "ubuntu-14-04-x64")
@@ -169,7 +165,7 @@ class TestManager(unittest.TestCase):
 
         image = global_images[0]
         self.assertEqual(image.token, self.token)
-        self.assertEqual(image.id, 119192817) 
+        self.assertEqual(image.id, 119192817)
         self.assertEqual(image.name, '14.04 x64')
         self.assertTrue(image.public)
         self.assertEqual(image.slug, "ubuntu-14-04-x64")
@@ -179,7 +175,7 @@ class TestManager(unittest.TestCase):
 
     @responses.activate
     def test_get_my_images(self):
-        data = self.load_from_file('images/all.json')
+        data = self.load_from_file('images/private.json')
 
         url = self.base_url + 'images/'
         responses.add(responses.GET, url,
@@ -192,13 +188,61 @@ class TestManager(unittest.TestCase):
 
         image = my_images[0]
         self.assertEqual(image.token, self.token)
-        self.assertEqual(image.id, 449676856) 
+        self.assertEqual(image.id, 449676856)
         self.assertEqual(image.name, 'My Snapshot')
         self.assertFalse(image.public)
         self.assertEqual(image.slug, "")
         self.assertEqual(image.distribution, 'Ubuntu')
         self.assertEqual(image.regions, ['nyc1', 'nyc3'])
         self.assertEqual(image.created_at, "2014-08-18T16:35:40Z")
+        self.assert_url_query_equal(responses.calls[0].request.url,
+                                    'https://api.digitalocean.com/v2/images/?private=true&per_page=200')
+
+    @responses.activate
+    def test_get_distro_images(self):
+        data = self.load_from_file('images/distro.json')
+
+        url = self.base_url + 'images/'
+        responses.add(responses.GET, url,
+                      body=data,
+                      status=200,
+                      content_type='application/json')
+
+        distro_images = self.manager.get_distro_images()
+        self.assertEqual(len(distro_images), 2)
+
+        image = distro_images[0]
+        self.assertEqual(image.token, self.token)
+        self.assertEqual(image.id, 119192817)
+        self.assertEqual(image.name, '14.04 x64')
+        self.assertTrue(image.public)
+        self.assertEqual(image.slug, "ubuntu-14-04-x64")
+        self.assertEqual(image.distribution, 'Ubuntu')
+        self.assert_url_query_equal(responses.calls[0].request.url,
+                                    'https://api.digitalocean.com/v2/images/?type=distribution&per_page=200')
+
+    @responses.activate
+    def test_get_app_images(self):
+        data = self.load_from_file('images/app.json')
+
+        url = self.base_url + 'images/'
+        responses.add(responses.GET, url,
+                      body=data,
+                      status=200,
+                      content_type='application/json')
+
+        app_images = self.manager.get_app_images()
+        self.assertEqual(len(app_images), 2)
+
+        image = app_images[0]
+        self.assertEqual(image.token, self.token)
+        self.assertEqual(image.id, 11146864)
+        self.assertEqual(image.name, 'MEAN on 14.04')
+        self.assertTrue(image.public)
+        self.assertEqual(image.slug, "mean")
+        self.assertEqual(image.distribution, 'Ubuntu')
+        self.assert_url_query_equal(responses.calls[0].request.url,
+                                    'https://api.digitalocean.com/v2/images/?type=application&per_page=200')
 
     @responses.activate
     def test_get_all_sshkeys(self):
@@ -221,7 +265,7 @@ class TestManager(unittest.TestCase):
         self.assertEqual(key.public_key,
             "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAQQDGk5V68BJ4P3Ereh779Vi/Ft2qs/rbXrcjKLGo6zsyeyFUE0svJUpRDEJvFSf8RlezKx1/1ulJu9+kZsxRiUKn example")
         self.assertEqual(key.fingerprint,
-            "f5:d1:78:ed:28:72:5f:e1:ac:94:fd:1f:e0:a3:48:6d")
+                         "f5:d1:78:ed:28:72:5f:e1:ac:94:fd:1f:e0:a3:48:6d")
 
     @responses.activate
     def test_get_all_domains(self):
