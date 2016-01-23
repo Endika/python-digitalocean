@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:
+    from urlparse import urlparse, parse_qs
+except:
+    from urllib.parse import urlparse, parse_qs
+
 from .baseapi import BaseAPI
 from .Droplet import Droplet
 from .Region import Region
@@ -8,6 +13,7 @@ from .Domain import Domain
 from .SSHKey import SSHKey
 from .Action import Action
 from .Account import Account
+from .FloatingIP import FloatingIP
 
 
 class Manager(BaseAPI):
@@ -41,7 +47,8 @@ class Manager(BaseAPI):
             than one page)
         """
         try:
-            pages = data['links']['pages']['last'].split('=')[-1]
+            lastpage_url = data['links']['pages']['last']
+            pages = parse_qs(urlparse(lastpage_url).query)['page'][0]
             key, values = data.popitem()
             for page in range(2, int(pages) + 1):
                 params.update({'page': page})
@@ -92,7 +99,22 @@ class Manager(BaseAPI):
                     droplet.ip_address = net['ip_address']
             if droplet.networks['v6']:
                 droplet.ip_v6_address = droplet.networks['v6'][0]['ip_address']
+
+            if "backups" in droplet.features:
+                droplet.backups = True
+            else:
+                droplet.backups = False
+            if "ipv6" in droplet.features:
+                droplet.ipv6 = True
+            else:
+                droplet.ipv6 = False
+            if "private_networking" in droplet.features:
+                droplet.private_networking = True
+            else:
+                droplet.private_networking = False
+
             droplets.append(droplet)
+
         return droplets
 
     def get_droplet(self, droplet_id):
@@ -225,6 +247,24 @@ class Manager(BaseAPI):
             Return an Action object by a specific ID.
         """
         return Action.get_object(api_token=self.token, action_id=action_id)
+
+    def get_all_floating_ips(self):
+        """
+            This function returns a list of FloatingIP objects.
+        """
+        data = self.get_data("floating_ips")
+        floating_ips = list()
+        for jsoned in data['floating_ips']:
+            floating_ip = FloatingIP(**jsoned)
+            floating_ip.token = self.token
+            floating_ips.append(floating_ip)
+        return floating_ips
+
+    def get_floating_ip(self, ip):
+        """
+            Returns a of FloatingIP object by its IP address.
+        """
+        return FloatingIP.get_object(api_token=self.token, ip=ip)
 
     def __str__(self):
         return "%s" % (self.token)

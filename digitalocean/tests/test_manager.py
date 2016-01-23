@@ -30,6 +30,7 @@ class TestManager(BaseTest):
         self.assertEqual(acct.email, 'web@digitalocean.com')
         self.assertEqual(acct.droplet_limit, 25)
         self.assertEqual(acct.email_verified, True)
+        self.assertEqual(acct.status, "active")
 
     @responses.activate
     def test_auth_fail(self):
@@ -67,6 +68,9 @@ class TestManager(BaseTest):
         self.assertEqual(droplet.memory, 512)
         self.assertEqual(droplet.vcpus, 1)
         self.assertEqual(droplet.disk, 20)
+        self.assertEqual(droplet.backups, True)
+        self.assertEqual(droplet.ipv6, True)
+        self.assertEqual(droplet.private_networking, False)
         self.assertEqual(droplet.region['slug'], "nyc3")
         self.assertEqual(droplet.status, "active")
         self.assertEqual(droplet.image['slug'], "ubuntu-14-04-x64")
@@ -287,6 +291,19 @@ class TestManager(BaseTest):
         self.assertEqual(domain.zone_file, "Example zone file text...")
         self.assertEqual(domain.ttl, 1800)
 
+    @responses.activate
+    def test_get_all_floating_ips(self):
+        data = self.load_from_file('floatingip/list.json')
+
+        responses.add(responses.GET, self.base_url + "floating_ips",
+                      body=data,
+                      status=200,
+                      content_type='application/json')
+
+        fips = self.manager.get_all_floating_ips()
+
+        self.assertEqual(fips[0].ip, "45.55.96.47")
+        self.assertEqual(fips[0].region['slug'], 'nyc3')
 
 if __name__ == '__main__':
     unittest.main()

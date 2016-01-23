@@ -138,6 +138,20 @@ class Droplet(BaseAPI):
                 self.ip_address = net['ip_address']
         if self.networks['v6']:
             self.ip_v6_address = self.networks['v6'][0]['ip_address']
+
+            if "backups" in self.features:
+                self.backups = True
+            else:
+                self.backups = False
+            if "ipv6" in self.features:
+                self.ipv6 = True
+            else:
+                self.ipv6 = False
+            if "private_networking" in self.features:
+                self.private_networking = True
+            else:
+                self.private_networking = False
+
         return self
 
     def _perform_action(self, params, return_dict=True):
@@ -321,11 +335,17 @@ class Droplet(BaseAPI):
             return_dict
         )
 
-    def enable_backups(self):
+    def enable_backups(self, return_dict=True):
         """
-            Enable automatic backups (Not yet implemented in APIv2)
+            Enable automatic backups
+
+            Optional Args:
+                return_dict - bool : Return a dict when True (default),
+                    otherwise return an Action.
+
+            Returns dict or Action
         """
-        print("Not yet implemented in APIv2")
+        return self._perform_action({'type': 'enable_backups'}, return_dict)
 
     def disable_backups(self, return_dict=True):
         """
@@ -343,11 +363,7 @@ class Droplet(BaseAPI):
         """
             Destroy the droplet
 
-            Optional Args:
-                return_dict - bool : Return a dict when True (default),
-                    otherwise return an Action.
-
-            Returns dict or Action
+            Returns dict
         """
         return self.get_data("droplets/%s" % self.id, type=DELETE)
 
